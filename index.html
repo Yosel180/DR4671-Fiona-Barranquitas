@@ -3,157 +3,201 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Mapa DR-4671 Barranquitas — SOLO datos del Sheet</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<title>Mapa DR-4671 Barranquitas — Sheet fijo (con fallbacks)</title>
 <style>
-  html, body, #map { height:100%; margin:0; }
-  #panel { position:fixed; right:12px; top:12px; z-index:10000; background:#fff;
-           border:1px solid #bbb; border-radius:10px; padding:10px; box-shadow:0 2px 8px rgba(0,0,0,.2); width:360px; font:14px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
-  #panel h4 { margin:0 0 6px 0; color:#1e88e5; font-size:16px; }
-  #panel code { font-size:11px; word-break:break-all; display:block; }
-  #panel button { padding:6px 10px; }
+  html, body, #map { height:100%; margin:0; }
+  #panel { position:fixed; right:12px; top:12px; z-index:10000; background:#fff;
+           border:1px solid #bbb; border-radius:10px; padding:10px; box-shadow:0 2px 8px rgba(0,0,0,.2);
+           width:360px; font:14px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Arial; }
+  #panel h4 { margin:0 0 6px 0; color:#1e88e5; font-size:16px; }
+  #panel code { font-size:11px; word-break:break-all; display:block; }
+  #panel button { padding:6px 10px; }
+  .warn { position:fixed; left:12px; top:12px; background:#fff3cd; color:#664d03; border:1px solid #ffe69c; padding:8px 10px; border-radius:8px; font:13px/1.2 system-ui; max-width:520px; display:none;}
 </style>
+<!-- Fallback CSS de Leaflet/MarkerCluster -->
+<link id="leafletCss" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<link id="mcCss1" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link id="mcCss2" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<noscript>
+  <style>#map{display:none}</style>
+  Debes habilitar JavaScript para ver el mapa.
+</noscript>
 </head>
 <body>
 <div id="map"></div>
+
 <div id="panel">
-  <h4>Datos en vivo (Google Sheets)</h4>
-  <div>Conectado a:</div>
-  <code>https://docs.google.com/spreadsheets/d/e/2PACX-1vT2GDDraOY7CZLm3lH4wKSWmywyd8ll3XqjxFeFpdmzS_UY1VeaXVvGecFzq7yOtg2fqigQ0gBUCxB2/pub?gid=296546725&single=true&output=csv</code>
-  <button id="btnReload">Recargar desde Sheet</button>
-  <small style="display:block;margin-top:6px;">Se carga automáticamente al abrir; el botón fuerza actualización.</small>
+  <h4>Datos en vivo (Google Sheets)</h4>
+  <div>Conectado a:</div>
+  <code>https://docs.google.com/spreadsheets/d/e/2PACX-1vT2GDDraOY7CZLm3lH4wKSWmywyd8ll3XqjxFeFpdmzS_UY1VeaXVvGecFzq7yOtg2fqigQ0gBUCxB2/pub?gid=296546725&single=true&output=csv</code>
+  <button id="btnReload">Recargar desde Sheet</button>
+  <small style="display:block;margin-top:6px;">Se carga automáticamente al abrir; el botón fuerza actualización.</small>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<div id="warn" class="warn"></div>
+
 <script>
-// ===== CONFIG =====
+/* =================== CONFIG =================== */
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT2GDDraOY7CZLm3lH4wKSWmywyd8ll3XqjxFeFpdmzS_UY1VeaXVvGecFzq7yOtg2fqigQ0gBUCxB2/pub?gid=296546725&single=true&output=csv";
 
-// Coordenadas base (del KMZ) para ubicar cada PW+Damage
+/* Coordenadas base por PW+Damage (derivadas del KMZ) */
 const BASE_POINTS = [
-  {"name":"pw-52 141479 Barranquitas Damage 01","road":"","lat":18.178385,"lng":-66.31398,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 02","road":"","lat":18.172245,"lng":-66.318265,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 03","road":"","lat":18.162452,"lng":-66.313207,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 04","road":"","lat":18.165617,"lng":-66.302289,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 05","road":"","lat":18.159787,"lng":-66.299273,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 06","road":"","lat":18.171879,"lng":-66.304006,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 07","road":"","lat":18.199658,"lng":-66.323263,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 08","road":"","lat":18.205076,"lng":-66.3147,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 09","road":"","lat":18.191883,"lng":-66.319962,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 10","road":"","lat":18.186511,"lng":-66.321474,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 11","road":"","lat":18.179993,"lng":-66.322163,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 12","road":"","lat":18.183287,"lng":-66.324231,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 13","road":"","lat":18.182457,"lng":-66.326432,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 14","road":"","lat":18.178056,"lng":-66.316714,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 15","road":"","lat":18.18821,"lng":-66.313907,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 16","road":"","lat":18.188599,"lng":-66.310193,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 17","road":"","lat":18.196367,"lng":-66.311944,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 18","road":"","lat":18.199986,"lng":-66.312767,"pw":52,"damage":141479},
-  {"name":"pw-52 141479 Barranquitas Damage 19","road":"","lat":18.198476,"lng":-66.320238,"pw":52,"damage":141479}
+  {"name":"pw-52 141479 Barranquitas Damage 01","lat":18.178385,"lng":-66.31398,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 02","lat":18.172245,"lng":-66.318265,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 03","lat":18.162452,"lng":-66.313207,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 04","lat":18.165617,"lng":-66.302289,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 05","lat":18.159787,"lng":-66.299273,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 06","lat":18.171879,"lng":-66.304006,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 07","lat":18.199658,"lng":-66.323263,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 08","lat":18.205076,"lng":-66.314700,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 09","lat":18.191883,"lng":-66.319962,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 10","lat":18.186511,"lng":-66.321474,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 11","lat":18.179993,"lng":-66.322163,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 12","lat":18.183287,"lng":-66.324231,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 13","lat":18.182457,"lng":-66.326432,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 14","lat":18.178056,"lng":-66.316714,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 15","lat":18.188210,"lng":-66.313907,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 16","lat":18.188599,"lng":-66.310193,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 17","lat":18.196367,"lng":-66.311944,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 18","lat":18.199986,"lng":-66.312767,"pw":52,"damage":141479},
+  {"name":"pw-52 141479 Barranquitas Damage 19","lat":18.198476,"lng":-66.320238,"pw":52,"damage":141479}
 ];
 
-// ===== MAPA =====
-const center = BASE_POINTS.reduce((a,p)=>[a[0]+p.lat, a[1]+p.lng],[0,0]).map(v=>v/BASE_POINTS.length);
-const map = L.map('map', { center: center, zoom: 12, zoomControl: true });
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap & Carto' }).addTo(map);
-
-// Control de capas (solo usaremos la del Sheet)
-let sheetLayer = null;
-function rebuildLayerControl(){
-  if(window._layerCtrl){ window._layerCtrl.remove(); }
-  const overlays = {};
-  if(sheetLayer) overlays["Daños (desde Sheet)"] = sheetLayer;
-  window._layerCtrl = L.control.layers(null, overlays, {collapsed:false}).addTo(map);
+/* ===== Helpers ===== */
+function showWarn(msg){
+  const w = document.getElementById('warn');
+  w.textContent = msg;
+  w.style.display = 'block';
 }
-rebuildLayerControl();
-
-// ===== SHEET =====
+function loadScript(url){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=url; s.onload=res; s.onerror=()=>rej(url); document.head.appendChild(s); }); }
 function normKey(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,''); }
 function parseCSV(text){
-  const lines = text.trim().split(/\r?\n/);
-  if(!lines.length) return [];
-  const rawHeaders = lines.shift().split(',').map(h=>h.trim());
-  const headers = rawHeaders.map(h=>normKey(h));
-  function unq(s){ return s.replace(/^"(.*)"$/,'$1').replace(/""/g,'"'); }
-  return lines.map(line=>{
-    let arr=[], cur='', q=false;
-    for(let i=0;i<line.length;i++){
-      const c=line[i];
-      if(c=='"'){ q=!q; cur+=c; }
-      else if(c==',' && !q){ arr.push(cur); cur=''; }
-      else { cur+=c; }
-    }
-    arr.push(cur);
-    const obj={}; headers.forEach((h,i)=> obj[h]=unq(arr[i]||'')); return obj;
-  });
+  const lines = text.trim().split(/\r?\n/);
+  if(!lines.length) return [];
+  const rawHeaders = lines.shift().split(',').map(h=>h.trim());
+  const headers = rawHeaders.map(h=>normKey(h));
+  function unq(s){ return s.replace(/^"(.*)"$/,'$1').replace(/""/g,'"'); }
+  return lines.map(line=>{
+    let arr=[], cur='', q=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c=='"'){ q=!q; cur+=c; }
+      else if(c==',' && !q){ arr.push(cur); cur=''; }
+      else { cur+=c; }
+    }
+    arr.push(cur);
+    const obj={}; headers.forEach((h,i)=> obj[h]=unq(arr[i]||'')); return obj;
+  });
 }
 function pick(row, keys){
-  for(const k of keys){
-    const v = row[normKey(k)];
-    if(v!==undefined && v!=='') return v;
-  }
-  return '';
+  for(const k of keys){
+    const v = row[normKey(k)];
+    if(v!==undefined && v!=='') return v;
+  }
+  return '';
 }
 
-// Construir capa MOSTRANDO SOLO lo que está en el Sheet (inner join PW|Damage)
+/* ===== Cargar librerías con fallback ===== */
+(async function loadLibs(){
+  try {
+    // Leaflet
+    try { await loadScript("https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"); }
+    catch(_) { await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"); }
+    // MarkerCluster
+    try { await loadScript("https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"); }
+    catch(_) { await loadScript("https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"); }
+    startMap();
+  } catch (e) {
+    console.error('No se pudo cargar Leaflet/MarkerCluster', e);
+    showWarn("No se pudieron cargar las librerías del mapa (posible bloqueo de red). Intenta desde otra red o avísame para empaquetarlas localmente.");
+  }
+})();
+
+/* ===== Iniciar mapa ===== */
+let map, sheetLayer=null;
+function startMap(){
+  const center = BASE_POINTS.reduce((a,p)=>[a[0]+p.lat, a[1]+p.lng],[0,0]).map(v=>v/BASE_POINTS.length);
+  map = L.map('map', { center, zoom: 12, zoomControl: true });
+
+  // Tiles: primero OSM, fallback Stamen
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '&copy; OpenStreetMap contributors' })
+    .addTo(map)
+    .on('tileerror', ()=> {
+      L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/terrain/{z}/{x}/{y}.jpg',
+        { attribution:'&copy; Stamen & OSM' }).addTo(map);
+    });
+
+  // Control (solo capa del Sheet)
+  rebuildLayerControl();
+
+  // Load CSV al abrir
+  loadSheet();
+
+  document.getElementById('btnReload').addEventListener('click', e=>{
+    e.stopPropagation();
+    loadSheet(true);
+  });
+}
+function rebuildLayerControl(){
+  if(window._layerCtrl){ window._layerCtrl.remove(); }
+  const overlays = {};
+  if(sheetLayer) overlays["Daños (desde Sheet)"] = sheetLayer;
+  window._layerCtrl = L.control.layers(null, overlays, {collapsed:false}).addTo(map);
+}
+
+/* ===== Cargar y dibujar SOLO lo del Sheet (sin duplicados) ===== */
 function buildSheetOnlyLayer(rows){
-  const idx = {};
-  rows.forEach(r=>{
-    const pw = parseInt(pick(r,['PW #','PW','P/W #','pw #','pw']));
-    const dmg = parseInt(pick(r,['Damage #','Damage','Daño #','damage#']));
-    if(isFinite(pw) && isFinite(dmg)) idx[pw+'|'+dmg] = r;
-  });
+  const idx = {};
+  rows.forEach(r=>{
+    const pw = parseInt(pick(r,['PW #','PW','P/W #','pw #','pw']));
+    const dmg = parseInt(pick(r,['Damage #','Damage','Daño #','damage#']));
+    if(isFinite(pw) && isFinite(dmg)) idx[pw+'|'+dmg] = r;
+  });
 
-  const cluster = L.markerClusterGroup();
-  const seen = new Set(); // para evitar duplicados exactos
+  const cluster = L.markerClusterGroup();
+  const seen = new Set();
 
-  BASE_POINTS.forEach(b=>{
-    const key = (b.pw!=null && b.damage!=null) ? (b.pw+'|'+b.damage) : null;
-    if(!key || !idx[key]) return; // << SOLO si existe en el Sheet
+  BASE_POINTS.forEach(b=>{
+    const key = (b.pw!=null && b.damage!=null) ? (b.pw+'|'+b.damage) : null;
+    if(!key || !idx[key]) return; // solo si existe en el Sheet
 
-    const row = idx[key];
-    const camino = pick(row,['Road Name','Camino','road','road name']) || (b.road || 'N/D');
-    const status = pick(row,['Status','Estatus','status','estatus']) || 'N/D';
-    const proj = pick(row,['Project #','Project Number','Proyecto #','project#','project number']) || 'N/D';
+    const row = idx[key];
+    const camino = pick(row,['Road Name','Camino','road','road name']) || 'N/D';
+    const status = pick(row,['Status','Estatus','status','estatus']) || 'N/D';
+    const proj   = pick(row,['Project #','Project Number','Proyecto #','project#','project number']) || 'N/D';
 
-    const dupKey = `${b.lat.toFixed(6)},${b.lng.toFixed(6)},${key}`;
-    if(seen.has(dupKey)) return; // evita duplicado
-    seen.add(dupKey);
+    const dupKey = `${b.lat.toFixed(6)},${b.lng.toFixed(6)},${key}`;
+    if(seen.has(dupKey)) return;
+    seen.add(dupKey);
 
-    const html = `<b>Camino:</b> ${camino}<br><b>Proyecto #:</b> ${proj}<br><b>PW:</b> ${b.pw??'N/D'}<br><b>Daño #:</b> ${b.damage??'N/D'}<br><b>Estatus:</b> ${status}`;
-    cluster.addLayer(L.marker([b.lat,b.lng]).bindPopup(html).bindTooltip(camino));
-  });
+    const html = `<b>Camino:</b> ${camino}<br><b>Proyecto #:</b> ${proj}<br><b>PW:</b> ${b.pw??'N/D'}<br><b>Daño #:</b> ${b.damage??'N/D'}<br><b>Estatus:</b> ${status}`;
+    cluster.addLayer(L.marker([b.lat,b.lng]).bindPopup(html).bindTooltip(camino));
+  });
 
-  cluster.options.name = "Daños (desde Sheet)";
-  return cluster;
+  cluster.options.name = "Daños (desde Sheet)";
+  return cluster;
 }
 
-function loadSheet(){
-  return fetch(CSV_URL, {mode:'cors', cache:'no-store'})
-    .then(r=>r.text())
-    .then(txt=>{
-      const rows = parseCSV(txt);
-      if(sheetLayer) map.removeLayer(sheetLayer);
-      sheetLayer = buildSheetOnlyLayer(rows);
-      map.addLayer(sheetLayer);
-      rebuildLayerControl();
-    })
-    .catch(err=>{
-      console.error(err);
-      alert('No se pudo leer el CSV. Ver consola (F12) para detalles.');
-    });
+function loadSheet(manual=false){
+  fetch(CSV_URL, {mode:'cors', cache: manual ? 'reload' : 'no-store'})
+    .then(r => {
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      // Si tu red bloquea Google, esta llamada puede fallar:
+      return r.text();
+    })
+    .then(txt=>{
+      const rows = parseCSV(txt);
+      if(sheetLayer) map.removeLayer(sheetLayer);
+      sheetLayer = buildSheetOnlyLayer(rows);
+      map.addLayer(sheetLayer);
+      rebuildLayerControl();
+    })
+    .catch(err=>{
+      console.error(err);
+      showWarn("No se pudo leer el CSV de Google (¿bloqueo de red/CORS?). Prueba desde otra red o envíame el CSV para incrustarlo localmente.");
+    });
 }
-
-document.getElementById('btnReload').addEventListener('click', e=>{
-  e.stopPropagation();
-  loadSheet();
-});
-
-// Auto-cargar al abrir
-loadSheet();
 </script>
 </body>
 </html>
